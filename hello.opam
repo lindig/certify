@@ -10,5 +10,5 @@ depends: [
   "dune" {build}
   "cmdliner"
 ]
-build: ["dune" "build" "-j" jobs "@install"]
+build: ["dune" "build" "-p" name "@install"]
 dev-repo: "git+https://github.com/lindig/hello.git"
