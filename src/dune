@@ -1,7 +1,8 @@
 (executable
  (name main)
  (public_name hello)
- (libraries cmdliner))
+ (libraries cmdliner cstruct ptime ptime.clock.os mirage-crypto
+   mirage-crypto-pk mirage-crypto-rng.unix x509))
 
 (rule
  (alias runtest)
