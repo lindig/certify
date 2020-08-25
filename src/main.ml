@@ -57,12 +57,11 @@ let selfsign name alt_names length days certfile =
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
 
-let sign name =
+let sign name alt_names =
   let () = Mirage_crypto_rng_unix.initialize () in
   let expire_days = 3650 in
   let certfile = Printf.sprintf "%s.pem" name in
   let length = 2048 in
-  let alt_names = [ "foo"; "bar" ] in
   selfsign name alt_names length expire_days certfile |> R.failwith_error_msg
 
 module Command = struct
@@ -79,10 +78,15 @@ module Command = struct
     C.Arg.(
       value & pos 0 string "localhost"
       & info [] ~docv:"NAME" ~doc:"hostname for certificate")
+
+ let alt_names =
+    C.Arg.(
+      value & opt_all string []
+      & info ["d"; "dns"] ~docv:"DNS" ~doc:"Alternative hostname")
   
   let sign =
     let doc = "Create a self-signed cert for a host" in
-    C.Term.(const sign $ host, info "sign" ~doc ~man:help)
+    C.Term.(const sign $ host $ alt_names, info "certify" ~doc ~man:help)
 end
 
 let main () = C.Term.(exit @@ eval Command.sign)
