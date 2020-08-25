@@ -57,12 +57,11 @@ let selfsign name alt_names length days certfile =
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
 
-let sign name alt_names =
+let certify name alt_names pemfile =
   let () = Mirage_crypto_rng_unix.initialize () in
   let expire_days = 3650 in
-  let certfile = Printf.sprintf "%s.pem" name in
   let length = 2048 in
-  selfsign name alt_names length expire_days certfile |> R.failwith_error_msg
+  selfsign name alt_names length expire_days pemfile |> R.failwith_error_msg
 
 module Command = struct
   let help =
@@ -74,21 +73,27 @@ module Command = struct
     ; `P "Check bug reports at https://github.com/lindig/hello/issues"
     ]
 
+  let pemfile =
+    C.Arg.(
+      value & opt string "certify.pem"
+      & info [ "o"; "pem"; "out" ] ~docv:"FILE.PEM" ~doc:"Target for PEM cert.")
+
   let host =
     C.Arg.(
       value & pos 0 string "localhost"
       & info [] ~docv:"NAME" ~doc:"hostname for certificate")
 
- let alt_names =
+  let alt_names =
     C.Arg.(
       value & opt_all string []
-      & info ["d"; "dns"] ~docv:"DNS" ~doc:"Alternative hostname")
-  
-  let sign =
+      & info [ "d"; "dns" ] ~docv:"DNS" ~doc:"Alternative hostname")
+
+  let certify =
     let doc = "Create a self-signed cert for a host" in
-    C.Term.(const sign $ host $ alt_names, info "certify" ~doc ~man:help)
+    C.Term.
+      (const certify $ host $ alt_names $ pemfile, info "certify" ~doc ~man:help)
 end
 
-let main () = C.Term.(exit @@ eval Command.sign)
+let main () = C.Term.(exit @@ eval Command.certify)
 
 let () = if !Sys.interactive then () else main ()
