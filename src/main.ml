@@ -79,7 +79,7 @@ module Command = struct
     C.Arg.(
       value & pos 0 string "localhost"
       & info [] ~docv:"NAME" ~doc:"hostname for certificate")
-
+  
   let sign =
     let doc = "Create a self-signed cert for a host" in
     C.Term.(const sign $ host, info "sign" ~doc ~man:help)
