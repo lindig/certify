@@ -22,18 +22,26 @@ let expire_in days =
   | Some expire -> R.ok (start, expire)
   | None -> R.error_msgf "can't represent %d as time span" days
 
-let sign days key pubkey issuer req _names _entity =
+let add_dns_names extension = function
+  | [] -> extension
+  | names ->
+      X509.Extension.(
+        add Subject_alt_name
+          (false, X509.General_name.(singleton DNS names))
+          extension)
+
+let sign days key pubkey issuer req alt_names _entity =
   expire_in days >>= fun (valid_from, valid_until) ->
   match (key, pubkey) with
   | `RSA priv, `RSA pub when Rsa.pub_of_priv priv = pub ->
       let _info = X509.Signing_request.info req in
-      let extensions = X509.Extension.empty in
+      let extensions = add_dns_names X509.Extension.empty alt_names in
       X509.Signing_request.sign ~valid_from ~valid_until ~extensions req key
         issuer
       |> R.reword_error (fun _ -> `Msg "something went wrong")
   | _ -> R.error_msg "public/private keys don't match"
 
-let selfsign name length days certfile =
+let selfsign name alt_names length days certfile =
   let rsa = Rsa.generate ~bits:length () in
   let privkey = `RSA rsa in
   let pubkey = `RSA (Rsa.pub_of_priv rsa) in
@@ -44,7 +52,7 @@ let selfsign name length days certfile =
   in
   let req = X509.Signing_request.create issuer privkey in
   let ent = `Server in
-  sign days privkey pubkey issuer req [] ent >>= fun cert ->
+  sign days privkey pubkey issuer req alt_names ent >>= fun cert ->
   let cert_pem = X509.Certificate.encode_pem cert in
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
@@ -54,7 +62,8 @@ let sign name =
   let expire_days = 3650 in
   let certfile = Printf.sprintf "%s.pem" name in
   let length = 2048 in
-  selfsign name length expire_days certfile |> R.failwith_error_msg
+  let alt_names = [ "foo"; "bar" ] in
+  selfsign name alt_names length expire_days certfile |> R.failwith_error_msg
 
 module Command = struct
   let help =
