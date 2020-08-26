@@ -4,15 +4,24 @@ open Rresult
 
 let defer f = Fun.protect ~finally:f
 
-let write_certs dest key cert =
+(** [write_cert] writes a PEM file to [path]. It attempts to do that
+  atomicaly by writing to a temporary file in the same directory first and
+  renaming the file at the end *)
+let write_certs path key cert =
   let delimit = "\n" in
+  let temp_dir = Filename.dirname path in
+  let tmp = Filename.temp_file ~temp_dir "certify-" ".tmp" in
   try
-    let fd = Unix.openfile dest [ Unix.O_WRONLY; Unix.O_CREAT ] 0o600 in
+    let fd = Unix.openfile tmp [ Unix.O_WRONLY ] 0o600 in
     defer (fun () -> Unix.close fd) @@ fun () ->
-    ignore @@ Unix.single_write fd (Cstruct.to_bytes key) 0 (Cstruct.len key);
-    ignore @@ Unix.single_write_substring fd delimit 0 (String.length delimit);
-    ignore @@ Unix.single_write fd (Cstruct.to_bytes cert) 0 (Cstruct.len cert);
-    R.ok ()
+    let n = 0 in
+    let n = n + Unix.write fd (Cstruct.to_bytes key) 0 (Cstruct.len key) in
+    let n = n + Unix.write_substring fd delimit 0 (String.length delimit) in
+    let n = n + Unix.write fd (Cstruct.to_bytes cert) 0 (Cstruct.len cert) in
+    if n = Cstruct.len key + String.length delimit + Cstruct.len cert then (
+      Unix.rename tmp path;
+      R.ok () )
+    else R.error_msgf "writing cert %s failed -- see %s" path tmp
   with e -> R.error_msg (Printexc.to_string e)
 
 let expire_in days =
@@ -30,16 +39,15 @@ let add_dns_names extension = function
           (false, X509.General_name.(singleton DNS names))
           extension)
 
-let sign days key pubkey issuer req alt_names _entity =
+let sign days key pubkey issuer req alt_names =
   expire_in days >>= fun (valid_from, valid_until) ->
   match (key, pubkey) with
   | `RSA priv, `RSA pub when Rsa.pub_of_priv priv = pub ->
-      let _info = X509.Signing_request.info req in
       let extensions = add_dns_names X509.Extension.empty alt_names in
       X509.Signing_request.sign ~valid_from ~valid_until ~extensions req key
         issuer
-      |> R.reword_error (fun _ -> `Msg "something went wrong")
-  | _ -> R.error_msg "public/private keys don't match"
+      |> R.reword_error (fun _ -> Printf.sprintf "signing failed" |> R.msg)
+  | _ -> R.error_msgf "public/private keys don't match (%s)" __LOC__
 
 let selfsign name alt_names length days certfile =
   let rsa = Rsa.generate ~bits:length () in
@@ -51,8 +59,7 @@ let selfsign name alt_names length days certfile =
     ]
   in
   let req = X509.Signing_request.create issuer privkey in
-  let ent = `Server in
-  sign days privkey pubkey issuer req alt_names ent >>= fun cert ->
+  sign days privkey pubkey issuer req alt_names >>= fun cert ->
   let cert_pem = X509.Certificate.encode_pem cert in
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
@@ -63,14 +70,14 @@ let certify name alt_names pemfile =
   let length = 2048 in
   selfsign name alt_names length expire_days pemfile |> R.failwith_error_msg
 
-module Command = struct
+module CLI = struct
   let help =
     [
       `P "These options are common to all commands."
     ; `S "MORE HELP"
     ; `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."
     ; `S "BUGS"
-    ; `P "Check bug reports at https://github.com/lindig/hello/issues"
+    ; `P "Check bug reports at https://github.com/lindig/certify/issues"
     ]
 
   let pemfile =
@@ -89,11 +96,11 @@ module Command = struct
       & info [ "d"; "dns" ] ~docv:"DNS" ~doc:"Alternative hostname")
 
   let certify =
-    let doc = "Create a self-signed cert for a host" in
+    let doc = "Create a self-signed certificate for a host" in
     C.Term.
       (const certify $ host $ alt_names $ pemfile, info "certify" ~doc ~man:help)
+
+  let main () = C.Term.(exit @@ eval certify)
 end
 
-let main () = C.Term.(exit @@ eval Command.certify)
-
-let () = if !Sys.interactive then () else main ()
+let () = if !Sys.interactive then () else CLI.main ()

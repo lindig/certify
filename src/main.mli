@@ -1,3 +1,5 @@
 (* empty *)
 
-val main : unit -> unit
+module CLI : sig
+  val main : unit -> unit
+end
