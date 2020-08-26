@@ -4,8 +4,18 @@ open Rresult
 
 let defer f = Fun.protect ~finally:f
 
+let write fd bytes offset length =
+  let written = Unix.write fd bytes offset length in
+  if written = length then R.ok ()
+  else R.error_msgf "Failed to write %d bytes" length
+
+let write_substring fd string offset length =
+  let written = Unix.write_substring fd string offset length in
+  if written = length then R.ok ()
+  else R.error_msgf "Failed to write %d bytes" length
+
 (** [write_cert] writes a PEM file to [path]. It attempts to do that
-  atomicaly by writing to a temporary file in the same directory first and
+  atomically by writing to a temporary file in the same directory first and
   renaming the file at the end *)
 let write_certs path key cert =
   let delimit = "\n" in
@@ -14,14 +24,11 @@ let write_certs path key cert =
   try
     let fd = Unix.openfile tmp [ Unix.O_WRONLY ] 0o600 in
     defer (fun () -> Unix.close fd) @@ fun () ->
-    let n = 0 in
-    let n = n + Unix.write fd (Cstruct.to_bytes key) 0 (Cstruct.len key) in
-    let n = n + Unix.write_substring fd delimit 0 (String.length delimit) in
-    let n = n + Unix.write fd (Cstruct.to_bytes cert) 0 (Cstruct.len cert) in
-    if n = Cstruct.len key + String.length delimit + Cstruct.len cert then (
-      Unix.rename tmp path;
-      R.ok () )
-    else R.error_msgf "writing cert %s failed -- see %s" path tmp
+    write fd (Cstruct.to_bytes key) 0 (Cstruct.len key) >>= fun () ->
+    write_substring fd delimit 0 (String.length delimit) >>= fun () ->
+    write fd (Cstruct.to_bytes cert) 0 (Cstruct.len cert) >>= fun () ->
+    Unix.rename tmp path;
+    R.ok ()
   with e -> R.error_msg (Printexc.to_string e)
 
 let expire_in days =
