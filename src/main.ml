@@ -75,9 +75,18 @@ let selfsign name alt_names length days certfile =
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
 
-let host name alt_names pemfile =
+let hostnames () =
+  let hostname = Unix.gethostname () in
+  Unix.getaddrinfo hostname "" [ Unix.AI_CANONNAME ]
+  |> List.filter_map (fun addrinfo ->
+         match addrinfo.Unix.ai_canonname with "" -> None | name -> Some name)
+
+let host name alt_names gethostnames pemfile =
   let expire_days = 3650 in
   let length = 2048 in
+  let alt_names =
+    alt_names @ match gethostnames with false -> [] | true -> hostnames ()
+  in
   selfsign name alt_names length expire_days pemfile |> R.failwith_error_msg
 
 module CLI = struct
@@ -95,6 +104,15 @@ module CLI = struct
       value & opt string "certify.pem"
       & info [ "o"; "pem"; "out" ] ~docv:"FILE.PEM" ~doc:"Target for PEM cert.")
 
+  let gethostnames =
+    C.Arg.(
+      value & opt bool false
+      & info [ "dns" ] ~docv:"DNS"
+          ~doc:
+            {|Use gethostname() results for alternative names. This
+          queries localhost for names based on the provided
+          hostname.|})
+
   let hostname =
     C.Arg.(
       value & pos 0 string "localhost"
@@ -103,12 +121,12 @@ module CLI = struct
   let alt_names =
     C.Arg.(
       value & opt_all string []
-      & info [ "d"; "dns" ] ~docv:"DNS" ~doc:"Alternative hostname")
+      & info [ "a"; "alt" ] ~docv:"ALT" ~doc:"Add alternative hostname")
 
   let certify =
     let doc = "Create a self-signed certificate for a host" in
     C.Term.
-      ( const host $ hostname $ alt_names $ pemfile
+      ( const host $ hostname $ alt_names $ gethostnames $ pemfile
       , info "certify" ~doc ~man:help )
 
   let main () = C.Term.(exit @@ eval certify)
