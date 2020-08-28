@@ -1,6 +1,10 @@
 module C = Cmdliner
 module Rsa = Mirage_crypto_pk.Rsa
-open Rresult
+open Rresult (* introduces >>= >>| and R *)
+
+(** initialize the random number generator at program startup when this
+module is loaded. *)
+let () = Mirage_crypto_rng_unix.initialize ()
 
 let defer f = Fun.protect ~finally:f
 
@@ -71,8 +75,7 @@ let selfsign name alt_names length days certfile =
   let key_pem = X509.Private_key.encode_pem privkey in
   write_certs certfile key_pem cert_pem
 
-let certify name alt_names pemfile =
-  let () = Mirage_crypto_rng_unix.initialize () in
+let host name alt_names pemfile =
   let expire_days = 3650 in
   let length = 2048 in
   selfsign name alt_names length expire_days pemfile |> R.failwith_error_msg
@@ -92,7 +95,7 @@ module CLI = struct
       value & opt string "certify.pem"
       & info [ "o"; "pem"; "out" ] ~docv:"FILE.PEM" ~doc:"Target for PEM cert.")
 
-  let host =
+  let hostname =
     C.Arg.(
       value & pos 0 string "localhost"
       & info [] ~docv:"NAME" ~doc:"hostname for certificate")
@@ -105,9 +108,10 @@ module CLI = struct
   let certify =
     let doc = "Create a self-signed certificate for a host" in
     C.Term.
-      (const certify $ host $ alt_names $ pemfile, info "certify" ~doc ~man:help)
+      ( const host $ hostname $ alt_names $ pemfile
+      , info "certify" ~doc ~man:help )
 
   let main () = C.Term.(exit @@ eval certify)
 end
 
-let () = if !Sys.interactive then () else CLI.main ()
+let () = CLI.main ()
