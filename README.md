@@ -4,7 +4,7 @@
 
 # Certify
 
-This is a small project to create a self-signed SSL certificates for a
+This is a small project to create a self-signed SSL certificate for a
 host. It is not comprehensive and I wrote it mostly to familiarise
 myself with the X509 API.
 
