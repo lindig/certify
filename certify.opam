@@ -1,11 +1,11 @@
 opam-version: "2.0"
 name: "certify"
-synopsis: "Minimal OCaml project for starting a new one"
+synopsis: "Minimal tool to create self-signed SSL certificates"
 maintainer: "Christian Lindig <lindig@gmail.com>"
 authors: "Christian Lindig <lindig@gmail.com>"
 license: "Unlicense"
-homepage: "https://github.com/lindig/hello"
-bug-reports: "https://github.com/lindig/hello/issues"
+homepage: "https://github.com/lindig/certify"
+bug-reports: "https://github.com/lindig/certify/issues"
 depends: [
   "dune" {build}
 	"cstruct"
@@ -15,4 +15,4 @@ depends: [
   "cmdliner"
 ]
 build: ["dune" "build" "-p" name "@install"]
-dev-repo: "git+https://github.com/lindig/hello.git"
+dev-repo: "git+https://github.com/lindig/certify.git"

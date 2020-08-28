@@ -1,11 +1,12 @@
 
 
-![Build](https://github.com/lindig/hello/workflows/CI/badge.svg)
+![Build](https://github.com/lindig/certify/workflows/CI/badge.svg)
 
-# Hello
+# Certify
 
-This is a minimal [OCaml] project that I use as a starting point for new
-projects.
+This is a small project to create a self-signed SSL certificates for a
+host. It is not comprehensive and I wrote it mostly to familiarise
+myself with the X509 API.
 
 * Top-level Makefile for convenience: just say `make` but the actual
   build is managed by Dune
