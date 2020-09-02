@@ -124,8 +124,7 @@ module CLI = struct
       & info [ "dns" ] ~docv:"DNS"
           ~doc:
             {|Use gethostname() results for alternative names. This
-          queries localhost for names based on the provided
-          hostname.|})
+          queries localhost for names hostname.|})
 
   let hostname =
     C.Arg.(
@@ -141,10 +140,10 @@ module CLI = struct
     C.Arg.(
       value
       & opt (some file) None
-      & info [ "rsa" ] ~docv:"RSA" ~doc:"Use this private RSA key")
+      & info [ "rsa" ] ~docv:"rsa.pem" ~doc:"Use this private RSA key file")
 
   let certify =
-    let doc = "Create a self-signed certificate for a host" in
+    let doc = "issue a self-signed certificate for a host" in
     C.Term.
       ( const host $ hostname $ alt_names $ gethostnames $ pemfile $ rsa_key
       , info "certify" ~doc ~man:help )
